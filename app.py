@@ -174,7 +174,7 @@ with col2:
 # ==================================================
 # HITUNG
 # ==================================================
-if st.button("⚖️ Hitung Massa", use_container_width=True):
+if st.button("Hitung Massa", use_container_width=True):
     try:
         mr, detail, _ = hitung_mr_lengkap(rumus, AR)
 
@@ -206,7 +206,7 @@ if st.button("⚖️ Hitung Massa", use_container_width=True):
             massa_tampil = massa_g
             label_massa = "g"
 
-        st.success("✅ Perhitungan Berhasil")
+        st.success("Perhitungan Berhasil")
 
         # tabel ringkasan (format sesuai permintaan)
         df = pd.DataFrame({
@@ -220,14 +220,14 @@ if st.button("⚖️ Hitung Massa", use_container_width=True):
             ]
         })
 
-        st.subheader("📊 Ringkasan")
+        st.subheader("Ringkasan")
         st.table(df)
 
         st.subheader("🔬 Detail Perhitungan Mr")
         for d in detail:
             st.write(d)
 
-        st.subheader("⚖️ Hasil Akhir")
+        st.subheader("Hasil Akhir")
         st.markdown(f"## **{massa_tampil:.4f} {label_massa}**")
 
     except Exception as e:
