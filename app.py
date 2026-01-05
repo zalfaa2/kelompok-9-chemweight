@@ -160,9 +160,16 @@ if st.button("⚖️ Hitung Massa", use_container_width=True):
         st.success("✅ Perhitungan Berhasil")
 
         df = pd.DataFrame({
-            "Parameter": ["Rumus", "Mr (g/mol)", "Konsentrasi", "Volume", "Massa (g)"],
-            "Nilai": [rumus, f"{mr:.4f}", nilai, f"{volume} {satuan}", f"{massa:.6f}"]
-        })
+    "Parameter": ["Rumus", "Mr (g/mol)", "Konsentrasi", "Volume", "Massa ditimbang (g)"],
+    "Nilai": [
+        rumus,
+        f"{mr:.4f}",
+        f"{nilai:.2f}",
+        f"{volume:.1f} {satuan}",
+        f"{massa:.4f}"
+    ]
+})
+
 
         st.subheader("📊 Ringkasan")
         st.table(df)
