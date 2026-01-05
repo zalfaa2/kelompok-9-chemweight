@@ -53,13 +53,16 @@ AR = {
 }
 
 # ==================================================
-# FORMULA PARSER
+# PARSER FORMULA (KURUNG) - AMAN
 # ==================================================
-def parse_formula(formula):
+def parse_formula(formula: str) -> dict:
     tokens = re.findall(r'([A-Z][a-z]?|\(|\)|\d+)', formula)
-    stack = [{}]
+    if not tokens:
+        raise ValueError(f"Rumus tidak valid: '{formula}'")
 
+    stack = [{}]
     i = 0
+
     while i < len(tokens):
         token = tokens[i]
 
@@ -67,15 +70,21 @@ def parse_formula(formula):
             stack.append({})
 
         elif token == ")":
+            if len(stack) == 1:
+                raise ValueError("Kurung tutup ')' tanpa kurung buka '('")
             group = stack.pop()
+
             mult = 1
             if i + 1 < len(tokens) and tokens[i + 1].isdigit():
                 mult = int(tokens[i + 1])
                 i += 1
+
             for el, cnt in group.items():
                 stack[-1][el] = stack[-1].get(el, 0) + cnt * mult
 
         elif token.isdigit():
+            if not stack[-1]:
+                raise ValueError(f"Angka '{token}' muncul di posisi tidak valid pada '{formula}'")
             prev = list(stack[-1].keys())[-1]
             stack[-1][prev] += int(token) - 1
 
@@ -84,30 +93,49 @@ def parse_formula(formula):
 
         i += 1
 
+    if len(stack) != 1:
+        raise ValueError("Ada kurung '(' yang belum ditutup")
+
     return stack[0]
 
+# ==================================================
+# HITUNG Mr (KURUNG + HIDRAT + KOEFISIEN DEPAN)
+# ==================================================
+def hitung_mr_lengkap(rumus: str, AR: dict):
+    rumus = rumus.strip()
+    if not rumus:
+        raise ValueError("Rumus kosong")
 
-def hitung_mr_lengkap(rumus, AR):
+    # split hidrat: titik tengah (·) atau titik biasa (.)
     parts = re.split(r'[·\.]', rumus)
+
     total = {}
     detail = []
 
     for part in parts:
-        m = re.match(r'^(\d+)(.*)$', part.strip())
+        part = part.strip()
+        if not part:
+            continue
+
+        # koefisien depan: 5H2O
+        m = re.match(r'^(\d+)(.*)$', part)
         coef = 1
-        core = part.strip()
+        core = part
         if m:
             coef = int(m.group(1))
-            core = m.group(2)
+            core = m.group(2).strip()
+            if core == "":
+                raise ValueError(f"Koefisien '{coef}' tanpa rumus pada '{rumus}'")
 
         parsed = parse_formula(core)
+
         for el, cnt in parsed.items():
             total[el] = total.get(el, 0) + cnt * coef
 
-    mr = 0
+    mr = 0.0
     for el, cnt in total.items():
         if el not in AR:
-            raise ValueError(f"Unsur '{el}' tidak ada di database")
+            raise ValueError(f"Unsur '{el}' tidak ada di database Ar")
         kontribusi = AR[el] * cnt
         mr += kontribusi
         detail.append(f"{el} × {cnt} = {kontribusi:.4f}")
@@ -118,23 +146,27 @@ def hitung_mr_lengkap(rumus, AR):
 # SIDEBAR
 # ==================================================
 st.sidebar.title("🧪 Chemical Weighing Calculator")
-st.sidebar.write("Hitung Mr & massa zat kimia dari konsentrasi")
+st.sidebar.write("Hitung Mr otomatis + massa (g/mg) dari M / N / ppm / % b/v")
 
 # ==================================================
 # UI INPUT
 # ==================================================
 st.title("🧪 Chemical Weighing Calculator")
+st.write("Support: **kurung** (Ca(OH)2) dan **hidrat** (CuSO4·5H2O / CuSO4.5H2O).")
 
 col1, col2 = st.columns(2)
 
 with col1:
-    rumus = st.text_input("Rumus kimia", placeholder="Contoh: CuSO4·5H2O")
+    rumus = st.text_input("Rumus kimia", placeholder="Contoh: CuSO4·5H2O, Ca(OH)2")
     jenis = st.selectbox("Jenis Konsentrasi", ["Molaritas (M)", "Normalitas (N)", "ppm", "% b/v"])
     nilai = st.number_input("Nilai Konsentrasi", min_value=0.0)
 
 with col2:
-    satuan = st.radio("Satuan Volume", ["mL", "L"])
+    satuan_vol = st.radio("Satuan Volume", ["mL", "L"])
     volume = st.number_input("Volume Larutan", min_value=0.0)
+
+    satuan_massa = st.radio("Satuan Massa Hasil", ["gram (g)", "miligram (mg)"])
+
     faktor = 1
     if jenis == "Normalitas (N)":
         faktor = st.number_input("Faktor Ekuivalen", min_value=1, step=1)
@@ -144,45 +176,62 @@ with col2:
 # ==================================================
 if st.button("⚖️ Hitung Massa", use_container_width=True):
     try:
-        mr, detail, komposisi = hitung_mr_lengkap(rumus, AR)
+        mr, detail, _ = hitung_mr_lengkap(rumus, AR)
 
-        volume_l = volume / 1000 if satuan == "mL" else volume
+        # konversi volume ke liter jika perlu
+        volume_l = volume / 1000 if satuan_vol == "mL" else volume
 
+        # hitung massa dalam GRAM sebagai basis
         if jenis == "Molaritas (M)":
-            massa = nilai * volume_l * mr
+            massa_g = nilai * volume_l * mr
+
         elif jenis == "Normalitas (N)":
-            massa = nilai * volume_l * (mr / faktor)
+            massa_g = nilai * volume_l * (mr / faktor)
+
         elif jenis == "ppm":
-            massa = (nilai * volume_l) / 1000
+            # asumsi 1 ppm ≈ 1 mg/L (larutan encer)
+            massa_g = (nilai * volume_l) / 1000  # mg -> g
+
+        else:  # % b/v
+            # % b/v = gram per 100 mL
+            # gunakan volume dalam mL untuk rumus ini
+            volume_ml = volume if satuan_vol == "mL" else volume * 1000
+            massa_g = (nilai * volume_ml) / 100
+
+        # konversi tampilan ke g atau mg
+        if satuan_massa == "miligram (mg)":
+            massa_tampil = massa_g * 1000
+            label_massa = "mg"
         else:
-            massa = (nilai * volume) / 100
+            massa_tampil = massa_g
+            label_massa = "g"
 
         st.success("✅ Perhitungan Berhasil")
 
+        # tabel ringkasan (format sesuai permintaan)
         df = pd.DataFrame({
-    "Parameter": ["Rumus", "Mr (g/mol)", "Konsentrasi", "Volume", "Massa ditimbang (g)"],
-    "Nilai": [
-        rumus,
-        f"{mr:.4f}",
-        f"{nilai:.2f}",
-        f"{volume:.1f} {satuan}",
-        f"{massa:.4f}"
-    ]
-})
-
+            "Parameter": ["Rumus", "Mr (g/mol)", "Konsentrasi", "Volume", f"Massa ({label_massa})"],
+            "Nilai": [
+                rumus,
+                f"{mr:.1f}",
+                f"{nilai:.2f}",                 # konsentrasi 2 angka belakang koma
+                f"{volume:.1f} {satuan_vol}",
+                f"{massa_tampil:.4f}"           # massa 4 angka belakang koma
+            ]
+        })
 
         st.subheader("📊 Ringkasan")
         st.table(df)
 
-        st.subheader("🔬 Detail Mr")
+        st.subheader("🔬 Detail Perhitungan Mr")
         for d in detail:
             st.write(d)
 
-    except Exception as e:
-        st.error(f"❌ Error: {e}")
+        st.subheader("⚖️ Hasil Akhir")
+        st.markdown(f"## **{massa_tampil:.4f} {label_massa}**")
 
-# ==================================================
-# FOOTER
-# ==================================================
+    except Exception as e:
+        st.error(f"❌ Error input/rumus: {e}")
+
 st.markdown("---")
-st.caption("Web Praktikum Kimia – Mr & Massa Otomatis (FINAL STABLE)")
+st.caption("Web Praktikum Kimia – Mr & Massa Otomatis (Stable Final)")
