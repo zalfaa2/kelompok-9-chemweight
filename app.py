@@ -153,6 +153,7 @@ st.sidebar.write("Hitung Mr otomatis + massa (g/mg) dari M / N / ppm / % b/v")
 # ==================================================
 st.title("🧪 Chemical Weighing Calculator")
 st.write("Support: **kurung** (Ca(OH)2) dan **hidrat** (CuSO4·5H2O / CuSO4.5H2O).")
+st.write("Gunakan kaidah penulisan yang sesuai")
 
 col1, col2 = st.columns(2)
 
@@ -169,7 +170,7 @@ with col2:
 
     faktor = 1
     if jenis == "Normalitas (N)":
-        faktor = st.number_input("Faktor Ekuivalen", min_value=1, step=1)
+        faktor = st.number_input("Faktor Ekuivalen (jumlah atom H)", min_value=1, step=1)
 
 # ==================================================
 # HITUNG
