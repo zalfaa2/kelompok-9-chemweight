@@ -223,11 +223,11 @@ if st.button("Hitung Massa", use_container_width=True):
         st.subheader("Ringkasan")
         st.table(df)
 
-        st.subheader("🔬 Detail Perhitungan Mr")
+        st.subheader("Detail Perhitungan Mr")
         for d in detail:
             st.write(d)
 
-        st.subheader("Hasil Akhir")
+        st.subheader("✅Hasil Akhir")
         st.markdown(f"## **{massa_tampil:.4f} {label_massa}**")
 
     except Exception as e:
