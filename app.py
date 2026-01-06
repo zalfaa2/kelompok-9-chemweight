@@ -106,7 +106,6 @@ def hitung_mr_lengkap(rumus: str, AR: dict):
     if not rumus:
         raise ValueError("Rumus kosong")
 
-    # split hidrat: titik tengah (·) atau titik biasa (.)
     parts = re.split(r'[·\.]', rumus)
 
     total = {}
@@ -117,7 +116,6 @@ def hitung_mr_lengkap(rumus: str, AR: dict):
         if not part:
             continue
 
-        # koefisien depan: 5H2O
         m = re.match(r'^(\d+)(.*)$', part)
         coef = 1
         core = part
@@ -165,6 +163,7 @@ with col2:
     satuan_vol = st.radio("Satuan Volume", ["mL", "L"])
     volume = st.number_input("Volume Larutan", min_value=0.0)
 
+    # ✅ PILIHAN SATUAN MASSA (g atau mg)
     satuan_massa = st.radio("Satuan Massa Hasil", ["gram (g)", "miligram (mg)"])
 
     faktor = 1
@@ -178,10 +177,9 @@ if st.button("⚖️ Hitung Massa", use_container_width=True):
     try:
         mr, detail, _ = hitung_mr_lengkap(rumus, AR)
 
-        # konversi volume ke liter jika perlu
         volume_l = volume / 1000 if satuan_vol == "mL" else volume
 
-        # hitung massa dalam GRAM sebagai basis
+        # hitung massa basis dalam GRAM
         if jenis == "Molaritas (M)":
             massa_g = nilai * volume_l * mr
 
@@ -189,16 +187,13 @@ if st.button("⚖️ Hitung Massa", use_container_width=True):
             massa_g = nilai * volume_l * (mr / faktor)
 
         elif jenis == "ppm":
-            # asumsi 1 ppm ≈ 1 mg/L (larutan encer)
             massa_g = (nilai * volume_l) / 1000  # mg -> g
 
         else:  # % b/v
-            # % b/v = gram per 100 mL
-            # gunakan volume dalam mL untuk rumus ini
             volume_ml = volume if satuan_vol == "mL" else volume * 1000
             massa_g = (nilai * volume_ml) / 100
 
-        # konversi tampilan ke g atau mg
+        # ✅ KONVERSI OUTPUT SESUAI PILIHAN (g / mg)
         if satuan_massa == "miligram (mg)":
             massa_tampil = massa_g * 1000
             label_massa = "mg"
@@ -208,19 +203,18 @@ if st.button("⚖️ Hitung Massa", use_container_width=True):
 
         st.success("✅ Perhitungan Berhasil")
 
-        # tabel ringkasan (format sesuai permintaan)
         df = pd.DataFrame({
             "Parameter": ["Rumus", "Mr (g/mol)", "Konsentrasi", "Volume", f"Massa ({label_massa})"],
             "Nilai": [
                 rumus,
                 f"{mr:.4f}",
-                f"{nilai:.2f}",                 # konsentrasi 2 angka belakang koma
+                f"{nilai:.2f}",
                 f"{volume:.1f} {satuan_vol}",
-                f"{massa_tampil:.4f}"           # massa 4 angka belakang koma
+                f"{massa_tampil:.4f}"
             ]
         })
 
-        st.subheader("📊 Ringkasan")
+        st.subheader("Ringkasan")
         st.table(df)
 
         st.subheader("🔬 Detail Perhitungan Mr")
