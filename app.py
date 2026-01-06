@@ -2,7 +2,14 @@ import streamlit as st
 import re
 import pandas as pd
 
-st.set_page_config(page_title="Chemical Weighing Calculator", page_icon="🧪", layout="wide")
+# ==================================================
+# PAGE CONFIG
+# ==================================================
+st.set_page_config(
+    page_title="Chemical Weighing Calculator",
+    page_icon="🧪",
+    layout="wide"
+)
 
 # ==================================================
 # DATABASE Ar (118 UNSUR)
@@ -44,69 +51,6 @@ AR = {
     "Rg": 282, "Cn": 285, "Nh": 286, "Fl": 289,
     "Mc": 290, "Lv": 293, "Ts": 294, "Og": 294
 }
-
-# ==================================================
-# VALIDASI KAPITALISASI RUMUS
-# ==================================================
-def validate_capitalization(formula: str, ar_dict: dict):
-    """
-    - Menolak huruf kecil yang muncul di posisi awal unsur (mis: nacl, naCl)
-    - Menolak huruf besar berturut-turut yang seharusnya unsur 2 huruf (mis: NACL)
-    - Jika bisa, memberi saran rumus yang benar berdasarkan simbol unsur yang ada di database.
-    """
-    # izinkan angka, huruf, kurung, titik hidrat
-    allowed = re.fullmatch(r"[A-Za-z0-9\(\)\.\·]+", formula)
-    if not allowed:
-        raise ValueError("Rumus mengandung karakter tidak valid. Gunakan hanya huruf, angka, (), '.' atau '·'.")
-
-    # Jika ada pola: huruf kecil langsung diikuti huruf kecil, atau awal unsur huruf kecil
-    # contoh salah: nacl, fe2so4 (seharusnya Fe2SO4)
-    if re.search(r"(^|[^A-Za-z])[a-z]", formula):
-        # ada huruf kecil yang bukan huruf kedua dari unsur
-        raise ValueError("Kapitalisasi salah: simbol unsur harus diawali huruf BESAR (contoh: NaCl, Fe2(SO4)3).")
-
-    # Bangun saran rumus yang benar jika user menulis campuran huruf aneh
-    # Caranya: parse token A-Z/a-z dan cek apakah tiap unsur ada di database
-    parts = re.split(r'[·\.]', formula)
-    suggested_parts = []
-
-    for part in parts:
-        part = part.strip()
-        if not part:
-            continue
-
-        # koefisien depan (hidrat)
-        m = re.match(r'^(\d+)(.*)$', part)
-        prefix = ""
-        core = part
-        if m:
-            prefix = m.group(1)
-            core = m.group(2)
-
-        # tokenisasi: unsur/angka/kurung
-        tokens = re.findall(r'([A-Za-z]{1,2}|\(|\)|\d+)', core)
-
-        suggested = []
-        for t in tokens:
-            if re.fullmatch(r"\d+|\(|\)", t):
-                suggested.append(t)
-                continue
-
-            # t adalah "unsur" tapi bisa salah kapital
-            # coba normalisasi: huruf pertama upper, kedua lower
-            norm = t[0].upper() + (t[1].lower() if len(t) == 2 else "")
-            if norm not in ar_dict:
-                # jika setelah normalisasi tetap tidak dikenal, berarti memang salah simbol
-                raise ValueError(f"Simbol unsur tidak dikenal: '{t}'. Periksa rumus kimia.")
-            # Jika user menulis simbol dengan kapitalisasi beda dari norm, anggap salah
-            if t != norm:
-                raise ValueError(f"Kapitalisasi salah pada '{t}'. Seharusnya '{norm}'.")
-            suggested.append(t)
-
-        suggested_parts.append(prefix + "".join(suggested))
-
-    suggested_formula = "·".join(suggested_parts)
-    return suggested_formula  # jika lolos, berarti sudah benar
 
 # ==================================================
 # PARSER FORMULA (KURUNG) - AMAN
@@ -162,6 +106,7 @@ def hitung_mr_lengkap(rumus: str, AR: dict):
     if not rumus:
         raise ValueError("Rumus kosong")
 
+    # split hidrat: titik tengah (·) atau titik biasa (.)
     parts = re.split(r'[·\.]', rumus)
 
     total = {}
@@ -172,6 +117,7 @@ def hitung_mr_lengkap(rumus: str, AR: dict):
         if not part:
             continue
 
+        # koefisien depan: 5H2O
         m = re.match(r'^(\d+)(.*)$', part)
         coef = 1
         core = part
@@ -192,24 +138,26 @@ def hitung_mr_lengkap(rumus: str, AR: dict):
             raise ValueError(f"Unsur '{el}' tidak ada di database Ar")
         kontribusi = AR[el] * cnt
         mr += kontribusi
-        # Ar 1 angka belakang koma pada detail:
-        detail.append(f"{el} ({AR[el]:.1f}) × {cnt} = {(AR[el]*cnt):.1f}")
+        detail.append(f"{el} × {cnt} = {kontribusi:.4f}")
 
     return mr, detail, total
 
 # ==================================================
-# UI
+# SIDEBAR
 # ==================================================
 st.sidebar.title("🧪 Chemical Weighing Calculator")
-st.sidebar.write("Mr otomatis + massa (g/mg) dari M / N / ppm / % b/v")
+st.sidebar.write("Hitung Mr otomatis + massa (g/mg) dari M / N / ppm / % b/v")
 
+# ==================================================
+# UI INPUT
+# ==================================================
 st.title("🧪 Chemical Weighing Calculator")
-st.write("Jika rumus tidak sesuai kapitalisasi (mis: nacl / NACL / naCl), aplikasi akan menampilkan error.")
+st.write("Support: **kurung** (Ca(OH)2) dan **hidrat** (CuSO4·5H2O / CuSO4.5H2O).")
 
 col1, col2 = st.columns(2)
 
 with col1:
-    rumus = st.text_input("Rumus kimia", placeholder="Contoh benar: NaCl, Ca(OH)2, CuSO4·5H2O")
+    rumus = st.text_input("Rumus kimia", placeholder="Contoh: CuSO4·5H2O, Ca(OH)2")
     jenis = st.selectbox("Jenis Konsentrasi", ["Molaritas (M)", "Normalitas (N)", "ppm", "% b/v"])
     nilai = st.number_input("Nilai Konsentrasi", min_value=0.0)
 
@@ -223,25 +171,34 @@ with col2:
     if jenis == "Normalitas (N)":
         faktor = st.number_input("Faktor Ekuivalen", min_value=1, step=1)
 
-if st.button("Hitung Massa", use_container_width=True):
+# ==================================================
+# HITUNG
+# ==================================================
+if st.button("⚖️ Hitung Massa", use_container_width=True):
     try:
-        # VALIDASI kapitalisasi dulu
-        validate_capitalization(rumus, AR)
-
         mr, detail, _ = hitung_mr_lengkap(rumus, AR)
 
+        # konversi volume ke liter jika perlu
         volume_l = volume / 1000 if satuan_vol == "mL" else volume
 
+        # hitung massa dalam GRAM sebagai basis
         if jenis == "Molaritas (M)":
             massa_g = nilai * volume_l * mr
+
         elif jenis == "Normalitas (N)":
             massa_g = nilai * volume_l * (mr / faktor)
+
         elif jenis == "ppm":
-            massa_g = (nilai * volume_l) / 1000
-        else:
+            # asumsi 1 ppm ≈ 1 mg/L (larutan encer)
+            massa_g = (nilai * volume_l) / 1000  # mg -> g
+
+        else:  # % b/v
+            # % b/v = gram per 100 mL
+            # gunakan volume dalam mL untuk rumus ini
             volume_ml = volume if satuan_vol == "mL" else volume * 1000
             massa_g = (nilai * volume_ml) / 100
 
+        # konversi tampilan ke g atau mg
         if satuan_massa == "miligram (mg)":
             massa_tampil = massa_g * 1000
             label_massa = "mg"
@@ -251,31 +208,30 @@ if st.button("Hitung Massa", use_container_width=True):
 
         st.success("✅ Perhitungan Berhasil")
 
+        # tabel ringkasan (format sesuai permintaan)
         df = pd.DataFrame({
             "Parameter": ["Rumus", "Mr (g/mol)", "Konsentrasi", "Volume", f"Massa ({label_massa})"],
             "Nilai": [
                 rumus,
-                f"{mr:.1f}",
-                f"{nilai:.2f}",
+                f"{mr:.4f}",
+                f"{nilai:.2f}",                 # konsentrasi 2 angka belakang koma
                 f"{volume:.1f} {satuan_vol}",
-                f"{massa_tampil:.4f}"
+                f"{massa_tampil:.4f}"           # massa 4 angka belakang koma
             ]
         })
 
-        st.subheader("Ringkasan")
+        st.subheader("📊 Ringkasan")
         st.table(df)
 
-        st.subheader("Detail Perhitungan Mr")
+        st.subheader("🔬 Detail Perhitungan Mr")
         for d in detail:
             st.write(d)
 
-        st.subheader("Hasil Akhir")
+        st.subheader("⚖️ Hasil Akhir")
         st.markdown(f"## **{massa_tampil:.4f} {label_massa}**")
 
     except Exception as e:
-        st.error(f"❌ Error: {e}")
+        st.error(f"❌ Error input/rumus: {e}")
 
 st.markdown("---")
-st.caption("Web Praktikum Kimia – Mr & Massa Otomatis (dengan validasi kapitalisasi)")
-
-
+st.caption("Web Praktikum Kimia – Mr & Massa Otomatis (Stable Final)")
