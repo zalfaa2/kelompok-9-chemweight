@@ -173,7 +173,7 @@ with col2:
 # ==================================================
 # HITUNG
 # ==================================================
-if st.button("⚖️ Hitung Massa", use_container_width=True):
+if st.button("Hitung Massa", use_container_width=True):
     try:
         mr, detail, _ = hitung_mr_lengkap(rumus, AR)
 
@@ -217,7 +217,7 @@ if st.button("⚖️ Hitung Massa", use_container_width=True):
         st.subheader("Ringkasan")
         st.table(df)
 
-        st.subheader("🔬 Detail Perhitungan Mr")
+        st.subheader("Detail Perhitungan Mr")
         for d in detail:
             st.write(d)
 
