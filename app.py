@@ -207,7 +207,7 @@ if st.button("Hitung Massa", use_container_width=True):
             "Parameter": ["Rumus", "Mr (g/mol)", "Konsentrasi", "Volume", f"Massa ({label_massa})"],
             "Nilai": [
                 rumus,
-                f"{mr:.4f}",
+                f"{mr:.2f}",
                 f"{nilai:.2f}",
                 f"{volume:.1f} {satuan_vol}",
                 f"{massa_tampil:.4f}"
